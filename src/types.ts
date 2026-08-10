@@ -32,6 +32,7 @@ export interface FallingDebris {
   angularVelocity: Vector3D;
   color: string;
   createdAt: number;
+  lastCollisionTime?: number;
 }
 
 export interface ComboFeedback {

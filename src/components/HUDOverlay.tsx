@@ -1,12 +1,13 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Pause, Volume2, VolumeX, Sparkles, Flame } from 'lucide-react';
+import { Pause, Volume2, VolumeX, Sparkles, Flame, Heart } from 'lucide-react';
 import { ComboFeedback } from '../types';
 import { soundEngine } from '../utils/audio';
 
 interface HUDOverlayProps {
   score: number;
   heightMeters: number;
+  lives: number;
   combo: ComboFeedback | null;
   isMuted: boolean;
   onPause: () => void;
@@ -16,6 +17,7 @@ interface HUDOverlayProps {
 export const HUDOverlay: React.FC<HUDOverlayProps> = ({
   score,
   heightMeters,
+  lives,
   combo,
   isMuted,
   onPause,
@@ -23,21 +25,54 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({
 }) => {
   return (
     <div className="absolute inset-0 p-3 sm:p-6 pb-safe pt-safe pl-safe pr-safe flex flex-col justify-between pointer-events-none z-10 select-none overflow-hidden max-h-[100dvh]">
-      {/* Top Header Controls & Score */}
-      <div className="w-full flex justify-between items-start pointer-events-auto">
+      {/* Top Header Controls, Score & 3-Life HUD */}
+      <div className="w-full flex justify-between items-start pointer-events-auto gap-2">
         {/* Score Card */}
-        <div className="glass-panel px-3.5 py-2 sm:px-5 sm:py-3 rounded-2xl shadow-xl flex flex-col border border-white/10">
+        <div className="glass-panel px-3 py-2 sm:px-5 sm:py-3 rounded-2xl shadow-xl flex flex-col border border-white/10 shrink-0">
           <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-indigo-300">
             TOWER HEIGHT
           </span>
           <div className="flex items-baseline space-x-1.5 sm:space-x-2">
-            <span className="text-2xl sm:text-4xl font-black text-white tracking-tight">{score}</span>
+            <span className="text-xl sm:text-3xl font-black text-white tracking-tight">{score}</span>
             <span className="text-xs sm:text-sm font-semibold text-slate-300">({heightMeters}m)</span>
           </div>
         </div>
 
+        {/* 3-Life Indicator */}
+        <div className="glass-panel px-3.5 py-2 sm:px-5 sm:py-3 rounded-2xl shadow-xl flex flex-col items-center border border-white/10">
+          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-rose-300">
+            STABILITY
+          </span>
+          <div className="flex items-center space-x-1.5 sm:space-x-2.5 mt-0.5 sm:mt-1">
+            {[1, 2, 3].map((heartNum) => {
+              const isAlive = heartNum <= lives;
+              return (
+                <motion.div
+                  key={heartNum}
+                  initial={false}
+                  animate={
+                    isAlive
+                      ? { scale: [1, 1.15, 1], opacity: 1 }
+                      : { scale: [1.35, 0.75, 0.85], opacity: 0.28, rotate: [0, -12, 0] }
+                  }
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className="relative flex items-center justify-center"
+                >
+                  <Heart
+                    className={`w-5 h-5 sm:w-6 sm:h-6 transition-all duration-300 ${
+                      isAlive
+                        ? 'text-rose-500 fill-rose-500 drop-shadow-[0_0_12px_rgba(244,63,94,0.85)]'
+                        : 'text-slate-600 fill-slate-800'
+                    }`}
+                  />
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Action Controls */}
-        <div className="flex space-x-2">
+        <div className="flex space-x-1.5 sm:space-x-2 shrink-0">
           <button
             onClick={() => {
               soundEngine.playButtonClick();

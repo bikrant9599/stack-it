@@ -10,7 +10,12 @@ import {
   FallingDebris,
   GameStats
 } from '../types';
-import { createBevelledBoxGeometry, THEMES } from '../utils/geometry';
+import {
+  createBevelledBoxGeometry,
+  createArchitecturalBlockGroup,
+  updateArchitecturalBlockGroupMaterials,
+  THEMES,
+} from '../utils/geometry';
 import { createRealisticBlockMaterial, getConcreteTexture } from '../utils/materials';
 import { soundEngine, MaterialType } from '../utils/audio';
 
@@ -21,6 +26,7 @@ interface ThreeCanvasProps {
   onBlockPlaced: (comboCount: number, isPerfect: boolean) => void;
   onGameOver: (stats: GameStats) => void;
   onUpdateStats: (score: number, heightMeters: number) => void;
+  onLifeChange?: (remainingLives: number) => void;
 }
 
 export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
@@ -30,6 +36,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   onBlockPlaced,
   onGameOver,
   onUpdateStats,
+  onLifeChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -42,9 +49,9 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
   // Game Logic State Refs
   const placedBlocksRef = useRef<PlacedBlock[]>([]);
-  const blockMeshesRef = useRef<THREE.Mesh[]>([]);
-  const blockSquashDataRef = useRef<Map<THREE.Mesh, { scaleY: number; scaleXZ: number; velY: number; velXZ: number }>>(new Map());
-  const debrisListRef = useRef<{ mesh: THREE.Mesh; data: FallingDebris }[]>([]);
+  const blockMeshesRef = useRef<THREE.Object3D[]>([]);
+  const blockSquashDataRef = useRef<Map<THREE.Object3D, { scaleY: number; scaleXZ: number; velY: number; velXZ: number }>>(new Map());
+  const debrisListRef = useRef<{ mesh: THREE.Object3D; data: FallingDebris }[]>([]);
   
   // Dust & Crumb Particles System Ref
   const dustParticlesRef = useRef<{ 
@@ -56,12 +63,14 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const ambientMotesRef = useRef<THREE.Points | null>(null);
 
   // Active Moving Block Ref
-  const activeMovingMeshRef = useRef<THREE.Mesh | null>(null);
+  const activeMovingMeshRef = useRef<THREE.Object3D | null>(null);
+
   const movingAxisRef = useRef<'x' | 'z'>('x');
   const movePhaseRef = useRef<number>(0); // 0 to 2PI for smooth sinusoidal motion
 
   // Game Attributes
   const scoreRef = useRef<number>(0);
+  const livesRef = useRef<number>(3);
   const comboCountRef = useRef<number>(0);
   const perfectCountRef = useRef<number>(0);
   const maxComboRef = useRef<number>(0);
@@ -278,8 +287,10 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     (pedestalMeshRef.current.material as THREE.MeshStandardMaterial).color.set(cfg.basePedestal);
 
     // Update block materials with realistic textures
-    blockMeshesRef.current.forEach((mesh, index) => {
-      mesh.material = createRealisticBlockMaterial(cfg.getPaletteColor(index), index, theme);
+    blockMeshesRef.current.forEach((obj, index) => {
+      if (obj instanceof THREE.Group) {
+        updateArchitecturalBlockGroupMaterials(obj, cfg.getPaletteColor(index), index, theme);
+      }
     });
   }, [theme]);
 
@@ -312,10 +323,13 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
     // Reset game counters
     scoreRef.current = 0;
+    livesRef.current = 3;
+    onLifeChange?.(3);
     comboCountRef.current = 0;
     perfectCountRef.current = 0;
     maxComboRef.current = 0;
     totalDropsRef.current = 0;
+
     placedBlocksRef.current = [];
 
     movingAxisRef.current = 'x';
@@ -355,12 +369,15 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
     placedBlocksRef.current.push(initialBlock);
 
-    const blockGeo = createBevelledBoxGeometry(initialDim.width, initialDim.height, initialDim.depth, 0.04);
-    const blockMat = createRealisticBlockMaterial(initialBlock.color, 0, theme);
-    const blockMesh = new THREE.Mesh(blockGeo, blockMat);
+    const blockMesh = createArchitecturalBlockGroup(
+      initialDim.width,
+      initialDim.height,
+      initialDim.depth,
+      0,
+      theme,
+      initialBlock.color
+    );
     blockMesh.position.set(initialPos.x, initialPos.y, initialPos.z);
-    blockMesh.castShadow = true;
-    blockMesh.receiveShadow = true;
     scene.add(blockMesh);
     blockMeshesRef.current.push(blockMesh);
 
@@ -388,13 +405,15 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     };
 
     const movingColor = themeConfig.getPaletteColor(newLevelIndex);
-    const geo = createBevelledBoxGeometry(prevDim.width, prevDim.height, prevDim.depth, 0.04);
-    const mat = createRealisticBlockMaterial(movingColor, newLevelIndex, theme);
-
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = createArchitecturalBlockGroup(
+      prevDim.width,
+      prevDim.height,
+      prevDim.depth,
+      newLevelIndex,
+      theme,
+      movingColor
+    );
     mesh.position.set(movingPos.x, movingPos.y, movingPos.z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
 
     if (activeMovingMeshRef.current) {
       scene.remove(activeMovingMeshRef.current);
@@ -495,7 +514,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       createDebrisBlock(
         { ...lastPlaced.dimensions },
         { x: currentX, y: activeMesh.position.y, z: currentZ },
-        { x: axis === 'x' ? Math.sign(delta || 1) * 1.8 : 0, y: -0.5, z: axis === 'z' ? Math.sign(delta || 1) * 1.8 : 0 },
+        { x: axis === 'x' ? Math.sign(delta || 1) * 2.2 : (Math.random() - 0.5) * 0.8, y: -0.4, z: axis === 'z' ? Math.sign(delta || 1) * 2.2 : (Math.random() - 0.5) * 0.8 },
         themeConfig.getPaletteColor(scoreRef.current + 1)
       );
 
@@ -504,24 +523,38 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         activeMovingMeshRef.current = null;
       }
 
-      screenShakeRef.current = 0.32;
-      soundEngine.playGameOverSound();
+      livesRef.current -= 1;
+      onLifeChange?.(livesRef.current);
+      soundEngine.playLifeLostSound();
+      screenShakeRef.current = 0.35;
 
-      const stats: GameStats = {
-        score: scoreRef.current,
-        heightMeters: Number((scoreRef.current * 0.6).toFixed(1)),
-        perfectCount: perfectCountRef.current,
-        maxCombo: maxComboRef.current,
-        accuracyPercent: totalDropsRef.current > 0 
-          ? Math.round((perfectCountRef.current / totalDropsRef.current) * 100) 
-          : 0,
-        totalBlocksDropped: totalDropsRef.current,
-      };
+      if (livesRef.current <= 0) {
+        soundEngine.playGameOverSound();
 
-      setTimeout(() => {
-        onGameOver(stats);
-      }, 550);
-      return;
+        const stats: GameStats = {
+          score: scoreRef.current,
+          heightMeters: Number((scoreRef.current * 0.6).toFixed(1)),
+          perfectCount: perfectCountRef.current,
+          maxCombo: maxComboRef.current,
+          accuracyPercent: totalDropsRef.current > 0 
+            ? Math.round((perfectCountRef.current / totalDropsRef.current) * 100) 
+            : 0,
+          totalBlocksDropped: totalDropsRef.current,
+        };
+
+        setTimeout(() => {
+          onGameOver(stats);
+        }, 750);
+        return;
+      } else {
+        timeScaleRef.current = 0.35;
+        setTimeout(() => {
+          if (sceneRef.current) {
+            spawnMovingBlock(lastPlaced.dimensions, { x: lastPlaced.position.x, y: lastPlaced.position.y, z: lastPlaced.position.z }, scoreRef.current + 1);
+          }
+        }, 320);
+        return;
+      }
     }
 
     // Check for Perfect Drop
@@ -567,7 +600,6 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       comboCountRef.current = 0;
       soundEngine.playSliceSound();
       soundEngine.playDropSound(0, materialType);
-      screenShakeRef.current = 0.10;
 
       compressionVelRef.current = -0.18;
 
@@ -607,6 +639,12 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         { x: newX, y: activeMesh.position.y, z: newZ },
         { width: newWidth, depth: newDepth, height: 0.6 }
       );
+
+      // Deduct 1 life because slice fell away
+      livesRef.current -= 1;
+      onLifeChange?.(livesRef.current);
+      soundEngine.playLifeLostSound();
+      screenShakeRef.current = 0.22;
     }
 
     if (sceneRef.current) {
@@ -626,13 +664,16 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
     placedBlocksRef.current.push(newPlacedBlock);
 
-    // Create fixed mesh with realistic material
-    const blockGeo = createBevelledBoxGeometry(newDim.width, newDim.height, newDim.depth, 0.04);
-    const blockMat = createRealisticBlockMaterial(newPlacedBlock.color, scoreRef.current + 1, theme);
-    const placedMesh = new THREE.Mesh(blockGeo, blockMat);
+    // Create fixed architectural block group with realistic materials
+    const placedMesh = createArchitecturalBlockGroup(
+      newDim.width,
+      newDim.height,
+      newDim.depth,
+      scoreRef.current + 1,
+      theme,
+      newPlacedBlock.color
+    );
     placedMesh.position.set(newPos.x, newPos.y, newPos.z);
-    placedMesh.castShadow = true;
-    placedMesh.receiveShadow = true;
 
     // Apply Physical Squash/Stretch Impact Response
     blockSquashDataRef.current.set(placedMesh, {
@@ -651,6 +692,27 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     onBlockPlaced(comboCountRef.current, isPerfect);
     onUpdateStats(scoreRef.current, Number((scoreRef.current * 0.6).toFixed(1)));
 
+    // Check if lives reached 0 after slice loss
+    if (livesRef.current <= 0) {
+      soundEngine.playGameOverSound();
+
+      const stats: GameStats = {
+        score: scoreRef.current,
+        heightMeters: Number((scoreRef.current * 0.6).toFixed(1)),
+        perfectCount: perfectCountRef.current,
+        maxCombo: maxComboRef.current,
+        accuracyPercent: totalDropsRef.current > 0 
+          ? Math.round((perfectCountRef.current / totalDropsRef.current) * 100) 
+          : 0,
+        totalBlocksDropped: totalDropsRef.current,
+      };
+
+      setTimeout(() => {
+        onGameOver(stats);
+      }, 750);
+      return;
+    }
+
     movingAxisRef.current = axis === 'x' ? 'z' : 'x';
     spawnMovingBlock(newDim, newPos, scoreRef.current + 1);
   };
@@ -665,12 +727,15 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     if (!sceneRef.current) return;
     const scene = sceneRef.current;
 
-    const geo = createBevelledBoxGeometry(size.width, size.height, size.depth, 0.03);
-    const mat = createRealisticBlockMaterial(color, scoreRef.current + 1, theme);
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = createArchitecturalBlockGroup(
+      size.width,
+      size.height,
+      size.depth,
+      scoreRef.current + 1,
+      theme,
+      color
+    );
     mesh.position.set(pos.x, pos.y, pos.z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
 
     scene.add(mesh);
 
@@ -755,16 +820,111 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         }
       });
 
-      // 3. Physics Update for Debris
+      // 3. Physics Update for Debris with Realistic Tower & Slice Collisions
+      const nowTime = performance.now();
       for (let i = debrisListRef.current.length - 1; i >= 0; i--) {
         const item = debrisListRef.current[i];
         const { mesh, data } = item;
 
-        data.velocity.y -= 12.0 * dt;
+        // Apply gravity & subtle air drag
+        data.velocity.y -= 14.0 * dt;
+        data.velocity.x *= (1 - 0.25 * dt);
+        data.velocity.z *= (1 - 0.25 * dt);
 
-        data.position.x += data.velocity.x * dt;
-        data.position.y += data.velocity.y * dt;
-        data.position.z += data.velocity.z * dt;
+        const nextX = data.position.x + data.velocity.x * dt;
+        const nextY = data.position.y + data.velocity.y * dt;
+        const nextZ = data.position.z + data.velocity.z * dt;
+
+        let collided = false;
+
+        // Check collision against placed tower blocks
+        for (let j = 0; j < placedBlocksRef.current.length; j++) {
+          const pb = placedBlocksRef.current[j];
+          const topY = pb.position.y + pb.dimensions.height / 2;
+          const halfW = pb.dimensions.width / 2 + data.dimensions.width / 2;
+          const halfD = pb.dimensions.depth / 2 + data.dimensions.depth / 2;
+
+          if (Math.abs(nextX - pb.position.x) < halfW && Math.abs(nextZ - pb.position.z) < halfD) {
+            const currentBottomY = data.position.y - data.dimensions.height / 2;
+            const nextBottomY = nextY - data.dimensions.height / 2;
+
+            if (currentBottomY >= topY - 0.08 && nextBottomY <= topY) {
+              collided = true;
+              const impactSpeed = Math.abs(data.velocity.y);
+
+              data.position.y = topY + data.dimensions.height / 2;
+              data.velocity.y = -data.velocity.y * 0.32;
+
+              const dx = data.position.x - pb.position.x;
+              const dz = data.position.z - pb.position.z;
+              const pushX = (Math.sign(dx) || (Math.random() - 0.5)) * (0.8 + Math.random() * 0.8);
+              const pushZ = (Math.sign(dz) || (Math.random() - 0.5)) * (0.8 + Math.random() * 0.8);
+
+              data.velocity.x += pushX * Math.min(impactSpeed, 6);
+              data.velocity.z += pushZ * Math.min(impactSpeed, 6);
+
+              data.angularVelocity.x += (Math.random() - 0.5) * impactSpeed * 4;
+              data.angularVelocity.y += (Math.random() - 0.5) * impactSpeed * 2;
+              data.angularVelocity.z += (Math.random() - 0.5) * impactSpeed * 4;
+
+              if (impactSpeed > 0.4 && (!data.lastCollisionTime || nowTime - data.lastCollisionTime > 90)) {
+                data.lastCollisionTime = nowTime;
+                const matType = getMaterialForIndex(pb.id);
+                soundEngine.playCollisionSound(impactSpeed, matType);
+
+                triggerDustPuff(
+                  { x: nextX, y: topY, z: nextZ },
+                  { width: data.dimensions.width, depth: data.dimensions.depth, height: 0.1 }
+                );
+              }
+              break;
+            }
+          }
+        }
+
+        // Check collision against Pedestal (Y = 0)
+        if (!collided && pedestalMeshRef.current) {
+          const pedTopY = 0.6;
+          const pedHalfW = 1.8 + data.dimensions.width / 2;
+          const pedHalfD = 1.8 + data.dimensions.depth / 2;
+
+          if (Math.abs(nextX) < pedHalfW && Math.abs(nextZ) < pedHalfD) {
+            const currentBottomY = data.position.y - data.dimensions.height / 2;
+            const nextBottomY = nextY - data.dimensions.height / 2;
+
+            if (currentBottomY >= pedTopY - 0.08 && nextBottomY <= pedTopY) {
+              collided = true;
+              const impactSpeed = Math.abs(data.velocity.y);
+
+              data.position.y = pedTopY + data.dimensions.height / 2;
+              data.velocity.y = -data.velocity.y * 0.28;
+
+              data.velocity.x += (Math.sign(data.position.x) || (Math.random() - 0.5)) * impactSpeed * 0.5;
+              data.velocity.z += (Math.sign(data.position.z) || (Math.random() - 0.5)) * impactSpeed * 0.5;
+
+              data.angularVelocity.x += (Math.random() - 0.5) * impactSpeed * 3;
+              data.angularVelocity.z += (Math.random() - 0.5) * impactSpeed * 3;
+
+              if (impactSpeed > 0.4 && (!data.lastCollisionTime || nowTime - data.lastCollisionTime > 90)) {
+                data.lastCollisionTime = nowTime;
+                soundEngine.playCollisionSound(impactSpeed, 'CONCRETE');
+                triggerDustPuff(
+                  { x: nextX, y: pedTopY, z: nextZ },
+                  { width: data.dimensions.width, depth: data.dimensions.depth, height: 0.1 }
+                );
+              }
+            }
+          }
+        }
+
+        if (!collided) {
+          data.position.x = nextX;
+          data.position.y = nextY;
+          data.position.z = nextZ;
+        } else {
+          data.position.x += data.velocity.x * dt;
+          data.position.z += data.velocity.z * dt;
+        }
 
         mesh.position.set(data.position.x, data.position.y, data.position.z);
 
@@ -772,7 +932,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         mesh.rotation.y += data.angularVelocity.y * dt;
         mesh.rotation.z += data.angularVelocity.z * dt;
 
-        if (data.position.y < -8) {
+        if (data.position.y < -12) {
           scene.remove(mesh);
           debrisListRef.current.splice(i, 1);
         }

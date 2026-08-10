@@ -321,3 +321,83 @@ export function createRealisticBlockMaterial(
     roughnessMap,
   });
 }
+
+/**
+ * Returns a high-specular metallic inlay material for architectural block slice channels
+ */
+export function getMetallicInlayMaterial(
+  color: string,
+  index: number,
+  theme: VisualTheme
+): THREE.MeshStandardMaterial {
+  const { bumpMap, roughnessMap } = getBrushedMetalTexture();
+
+  if (theme === 'MONOCHROME') {
+    return new THREE.MeshStandardMaterial({
+      color: index % 3 === 0 ? '#f59e0b' : '#e2e8f0', // Gold or Brushed Steel
+      metalness: 0.92,
+      roughness: 0.15,
+      bumpMap,
+      bumpScale: 0.003,
+      roughnessMap,
+    });
+  }
+
+  if (theme === 'NEON') {
+    return new THREE.MeshStandardMaterial({
+      color,
+      metalness: 0.88,
+      roughness: 0.18,
+      emissive: color,
+      emissiveIntensity: 0.15,
+      bumpMap,
+      bumpScale: 0.003,
+      roughnessMap,
+    });
+  }
+
+  // DEFAULT / PASTEL / SUNSET ARCHITECTURAL PALETTE INLAYS
+  const isHigh = index > 15;
+  const inlayColor = isHigh ? (index % 2 === 0 ? '#fbbf24' : '#38bdf8') : (index % 2 === 0 ? '#d1d5db' : '#fbbf24');
+
+  return new THREE.MeshStandardMaterial({
+    color: inlayColor,
+    metalness: 0.9,
+    roughness: 0.18,
+    bumpMap,
+    bumpScale: 0.003,
+    roughnessMap,
+  });
+}
+
+/**
+ * Returns a dark satin shadow groove material for recessed channel cuts
+ */
+export function getDarkGrooveMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: '#0a0e17',
+    metalness: 0.3,
+    roughness: 0.85,
+  });
+}
+
+/**
+ * Returns a polished ceramic / glass / anodized accent material
+ */
+export function getAccentCapMaterial(
+  color: string,
+  index: number,
+  theme: VisualTheme
+): THREE.MeshStandardMaterial {
+  const { bumpMap, roughnessMap } = getConcreteTexture();
+
+  return new THREE.MeshStandardMaterial({
+    color: color,
+    metalness: theme === 'MONOCHROME' ? 0.4 : 0.25,
+    roughness: 0.2,
+    bumpMap,
+    bumpScale: 0.002,
+    roughnessMap,
+  });
+}
+

@@ -436,6 +436,94 @@ class SoundEngine {
   }
 
   /**
+   * Dynamic collision audio based on impact velocity (light tick/clack, medium clunk, heavy thud)
+   */
+  public playCollisionSound(impactSpeed: number, material: MaterialType = 'CONCRETE') {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const speedRatio = Math.min(1.0, impactSpeed / 10.0);
+    const pitchVariation = 0.92 + Math.random() * 0.16;
+
+    if (impactSpeed < 2.5) {
+      // LIGHT COLLISION: "tick / clack"
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(650 * pitchVariation, now);
+      osc.frequency.exponentialRampToValueAtTime(300 * pitchVariation, now + 0.04);
+
+      gain.gain.setValueAtTime(0.12 * Math.max(0.3, speedRatio * 2), now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.04);
+    } else if (impactSpeed < 6.0) {
+      // MEDIUM COLLISION: "clunk / thunk"
+      const subOsc = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(160 * pitchVariation, now);
+      subOsc.frequency.exponentialRampToValueAtTime(50 * pitchVariation, now + 0.09);
+
+      subGain.gain.setValueAtTime(0.28 * speedRatio, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+      subOsc.connect(subGain);
+      subGain.connect(this.ctx.destination);
+      subOsc.start(now);
+      subOsc.stop(now + 0.09);
+    } else {
+      // HEAVY COLLISION: "THUD"
+      const subOsc = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(110 * pitchVariation, now);
+      subOsc.frequency.exponentialRampToValueAtTime(32 * pitchVariation, now + 0.16);
+
+      subGain.gain.setValueAtTime(0.55, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+      subOsc.connect(subGain);
+      subGain.connect(this.ctx.destination);
+      subOsc.start(now);
+      subOsc.stop(now + 0.16);
+    }
+  }
+
+  /**
+   * Soft warning sound played when player loses a life
+   */
+  public playLifeLostSound() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(311.13, now); // Eb4
+    osc.frequency.exponentialRampToValueAtTime(233.08, now + 0.35); // Bb3 (minor cadence)
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.35);
+  }
+
+  /**
    * UI Click Sound
    */
   public playButtonClick() {
