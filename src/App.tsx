@@ -37,7 +37,6 @@ export default function App() {
   // Real-time Game Statistics
   const [currentScore, setCurrentScore] = useState<number>(0);
   const [currentHeight, setCurrentHeight] = useState<number>(0);
-  const [lives, setLives] = useState<number>(3);
   const [comboFeedback, setComboFeedback] = useState<ComboFeedback | null>(null);
 
   // Game Over Details
@@ -69,7 +68,6 @@ export default function App() {
   const handleStartGame = () => {
     setCurrentScore(0);
     setCurrentHeight(0);
-    setLives(3);
     setComboFeedback(null);
     setIsNewRecord(false);
     setGameState('PLAYING');
@@ -138,7 +136,6 @@ export default function App() {
           onBlockPlaced={handleBlockPlaced}
           onGameOver={handleGameOver}
           onUpdateStats={handleUpdateStats}
-          onLifeChange={(remainingLives) => setLives(remainingLives)}
         />
       )}
 
@@ -163,7 +160,7 @@ export default function App() {
         <HUDOverlay
           score={currentScore}
           heightMeters={currentHeight}
-          lives={lives}
+          bestScore={highScore}
           combo={comboFeedback}
           isMuted={isMuted}
           onPause={() => setGameState('PAUSED')}

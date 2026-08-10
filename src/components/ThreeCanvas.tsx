@@ -26,7 +26,6 @@ interface ThreeCanvasProps {
   onBlockPlaced: (comboCount: number, isPerfect: boolean) => void;
   onGameOver: (stats: GameStats) => void;
   onUpdateStats: (score: number, heightMeters: number) => void;
-  onLifeChange?: (remainingLives: number) => void;
 }
 
 export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
@@ -36,7 +35,6 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   onBlockPlaced,
   onGameOver,
   onUpdateStats,
-  onLifeChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -70,7 +68,6 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
   // Game Attributes
   const scoreRef = useRef<number>(0);
-  const livesRef = useRef<number>(3);
   const comboCountRef = useRef<number>(0);
   const perfectCountRef = useRef<number>(0);
   const maxComboRef = useRef<number>(0);
@@ -323,8 +320,6 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
     // Reset game counters
     scoreRef.current = 0;
-    livesRef.current = 3;
-    onLifeChange?.(3);
     comboCountRef.current = 0;
     perfectCountRef.current = 0;
     maxComboRef.current = 0;
@@ -523,38 +518,24 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         activeMovingMeshRef.current = null;
       }
 
-      livesRef.current -= 1;
-      onLifeChange?.(livesRef.current);
-      soundEngine.playLifeLostSound();
       screenShakeRef.current = 0.35;
+      soundEngine.playGameOverSound();
 
-      if (livesRef.current <= 0) {
-        soundEngine.playGameOverSound();
+      const stats: GameStats = {
+        score: scoreRef.current,
+        heightMeters: Number((scoreRef.current * 0.6).toFixed(1)),
+        perfectCount: perfectCountRef.current,
+        maxCombo: maxComboRef.current,
+        accuracyPercent: totalDropsRef.current > 0 
+          ? Math.round((perfectCountRef.current / totalDropsRef.current) * 100) 
+          : 0,
+        totalBlocksDropped: totalDropsRef.current,
+      };
 
-        const stats: GameStats = {
-          score: scoreRef.current,
-          heightMeters: Number((scoreRef.current * 0.6).toFixed(1)),
-          perfectCount: perfectCountRef.current,
-          maxCombo: maxComboRef.current,
-          accuracyPercent: totalDropsRef.current > 0 
-            ? Math.round((perfectCountRef.current / totalDropsRef.current) * 100) 
-            : 0,
-          totalBlocksDropped: totalDropsRef.current,
-        };
-
-        setTimeout(() => {
-          onGameOver(stats);
-        }, 750);
-        return;
-      } else {
-        timeScaleRef.current = 0.35;
-        setTimeout(() => {
-          if (sceneRef.current) {
-            spawnMovingBlock(lastPlaced.dimensions, { x: lastPlaced.position.x, y: lastPlaced.position.y, z: lastPlaced.position.z }, scoreRef.current + 1);
-          }
-        }, 320);
-        return;
-      }
+      setTimeout(() => {
+        onGameOver(stats);
+      }, 750);
+      return;
     }
 
     // Check for Perfect Drop
@@ -639,12 +620,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         { x: newX, y: activeMesh.position.y, z: newZ },
         { width: newWidth, depth: newDepth, height: 0.6 }
       );
-
-      // Deduct 1 life because slice fell away
-      livesRef.current -= 1;
-      onLifeChange?.(livesRef.current);
-      soundEngine.playLifeLostSound();
-      screenShakeRef.current = 0.22;
+      screenShakeRef.current = 0.12;
     }
 
     if (sceneRef.current) {
@@ -691,27 +667,6 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     scoreRef.current += 1;
     onBlockPlaced(comboCountRef.current, isPerfect);
     onUpdateStats(scoreRef.current, Number((scoreRef.current * 0.6).toFixed(1)));
-
-    // Check if lives reached 0 after slice loss
-    if (livesRef.current <= 0) {
-      soundEngine.playGameOverSound();
-
-      const stats: GameStats = {
-        score: scoreRef.current,
-        heightMeters: Number((scoreRef.current * 0.6).toFixed(1)),
-        perfectCount: perfectCountRef.current,
-        maxCombo: maxComboRef.current,
-        accuracyPercent: totalDropsRef.current > 0 
-          ? Math.round((perfectCountRef.current / totalDropsRef.current) * 100) 
-          : 0,
-        totalBlocksDropped: totalDropsRef.current,
-      };
-
-      setTimeout(() => {
-        onGameOver(stats);
-      }, 750);
-      return;
-    }
 
     movingAxisRef.current = axis === 'x' ? 'z' : 'x';
     spawnMovingBlock(newDim, newPos, scoreRef.current + 1);

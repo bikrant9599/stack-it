@@ -1,13 +1,13 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Pause, Volume2, VolumeX, Sparkles, Flame, Heart } from 'lucide-react';
+import { Pause, Volume2, VolumeX, Sparkles, Flame, Trophy } from 'lucide-react';
 import { ComboFeedback } from '../types';
 import { soundEngine } from '../utils/audio';
 
 interface HUDOverlayProps {
   score: number;
   heightMeters: number;
-  lives: number;
+  bestScore: number;
   combo: ComboFeedback | null;
   isMuted: boolean;
   onPause: () => void;
@@ -17,7 +17,7 @@ interface HUDOverlayProps {
 export const HUDOverlay: React.FC<HUDOverlayProps> = ({
   score,
   heightMeters,
-  lives,
+  bestScore,
   combo,
   isMuted,
   onPause,
@@ -25,49 +25,32 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({
 }) => {
   return (
     <div className="absolute inset-0 p-3 sm:p-6 pb-safe pt-safe pl-safe pr-safe flex flex-col justify-between pointer-events-none z-10 select-none overflow-hidden max-h-[100dvh]">
-      {/* Top Header Controls, Score & 3-Life HUD */}
+      {/* Top Header Controls, Score & Best Score */}
       <div className="w-full flex justify-between items-start pointer-events-auto gap-2">
-        {/* Score Card */}
-        <div className="glass-panel px-3 py-2 sm:px-5 sm:py-3 rounded-2xl shadow-xl flex flex-col border border-white/10 shrink-0">
-          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-indigo-300">
-            TOWER HEIGHT
-          </span>
-          <div className="flex items-baseline space-x-1.5 sm:space-x-2">
-            <span className="text-xl sm:text-3xl font-black text-white tracking-tight">{score}</span>
-            <span className="text-xs sm:text-sm font-semibold text-slate-300">({heightMeters}m)</span>
+        {/* Score & Best Card Group */}
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+          {/* Current Score */}
+          <div className="glass-panel px-3.5 py-2 sm:px-5 sm:py-3 rounded-2xl shadow-xl flex flex-col border border-white/10">
+            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-indigo-300">
+              SCORE
+            </span>
+            <div className="flex items-baseline space-x-1.5 sm:space-x-2">
+              <span className="text-xl sm:text-3xl font-black text-white tracking-tight">{score}</span>
+              <span className="text-xs sm:text-sm font-semibold text-slate-300">({heightMeters}m)</span>
+            </div>
           </div>
-        </div>
 
-        {/* 3-Life Indicator */}
-        <div className="glass-panel px-3.5 py-2 sm:px-5 sm:py-3 rounded-2xl shadow-xl flex flex-col items-center border border-white/10">
-          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-rose-300">
-            STABILITY
-          </span>
-          <div className="flex items-center space-x-1.5 sm:space-x-2.5 mt-0.5 sm:mt-1">
-            {[1, 2, 3].map((heartNum) => {
-              const isAlive = heartNum <= lives;
-              return (
-                <motion.div
-                  key={heartNum}
-                  initial={false}
-                  animate={
-                    isAlive
-                      ? { scale: [1, 1.15, 1], opacity: 1 }
-                      : { scale: [1.35, 0.75, 0.85], opacity: 0.28, rotate: [0, -12, 0] }
-                  }
-                  transition={{ duration: 0.35, ease: 'easeOut' }}
-                  className="relative flex items-center justify-center"
-                >
-                  <Heart
-                    className={`w-5 h-5 sm:w-6 sm:h-6 transition-all duration-300 ${
-                      isAlive
-                        ? 'text-rose-500 fill-rose-500 drop-shadow-[0_0_12px_rgba(244,63,94,0.85)]'
-                        : 'text-slate-600 fill-slate-800'
-                    }`}
-                  />
-                </motion.div>
-              );
-            })}
+          {/* Best Score */}
+          <div className="glass-panel px-3 py-2 sm:px-4 sm:py-3 rounded-2xl shadow-xl flex flex-col border border-amber-500/20 bg-amber-500/5">
+            <div className="flex items-center space-x-1">
+              <Trophy className="w-3 h-3 text-amber-400" />
+              <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-amber-300">
+                BEST
+              </span>
+            </div>
+            <span className="text-lg sm:text-2xl font-black text-amber-300 tracking-tight mt-0.5 sm:mt-0">
+              {Math.max(score, bestScore)}
+            </span>
           </div>
         </div>
 
