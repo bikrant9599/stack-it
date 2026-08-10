@@ -1,0 +1,6 @@
+{
+  "name": "Stack It",
+  "description": "A realistic 3D block stacking physics game with physical weight, bevelled blocks, smooth camera tracking, dynamic lighting, and score progression.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
